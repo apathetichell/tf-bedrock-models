@@ -1,29 +1,30 @@
 # Copyright (c) HashiCorp, Inc.
 # SPDX-License-Identifier: MPL-2.0
 
+# Copyright (c) HashiCorp, Inc.
+# SPDX-License-Identifier: MPL-2.0
+
+# Input variable definitio
 
 
-module "set_up_snowflake_integration" {
-  source = "./split-snowflake-role"
-  aws_region="us-west-2"
-s3_bucketname="snowflake-s3-bucket1-test-terraform2"
-s3_bucketname_tag = "snowflake-s3-bucket1-test-terraform2"
-s3_bucketname_env ="DEV"
-snowflakeRole = "Snowflake_S3_integration_retest"
-snowflakes3policyname = "Snowflake_S3_integration_policy2"
-snowflakeS3StorageIntegration = "S3_Storage2"
+module "set_up_bedrock_agent" {
+  source = "./aws-bedrock"
 
-  }
+bedrock_invoke_policy_name="Bedrock-InvokeModel-Policy"
 
 
-module "revise-arn" {
-    source="./aws-update-role"
+bedrock_retrieve_schema_name="retrieve_bedrock_schema"
 
-storage_integration_arn = module.set_up_snowflake_integration.storage_integration
-external_id =module.set_up_snowflake_integration.external_id
-policy_arn = module.set_up_snowflake_integration.snowflake3policyarn
-snowflakeRole = "Snowflake_S3_integration_retest"
+bedrock_role="AmazonBedrockExecutionRoleForAgents_workshop"
 
-depends_on=[module.set_up_snowflake_integration]
+bedrock_model="anthropic.claude-3-haiku-20240307-v1:0" //anthropic.claude-3-haiku-20240307-v1"
 
-}
+agent_name="Agent-AWS_bedrock_claude_haiku_terraform_test"
+
+agent_instruction="You are an expert AWS Certified Solutions Architect. Your role is to help customers understand best practices on building on AWS"
+
+ecr_name="agent_ecr_bedrock"
+
+ }
+
+
