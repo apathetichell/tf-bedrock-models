@@ -212,8 +212,6 @@ resource "aws_iam_policy" "lambda-invoke-policy" {
 
 
 
-
-
 resource "aws_iam_role" "bedrock-role" {
   assume_role_policy = jsonencode({
     Statement = [{
@@ -246,18 +244,21 @@ resource "aws_iam_role" "bedrock-role" {
 
 }
 
-/*
-resource "aws_s3_bucket" "api-specs-bucket" {
-  bucket = "terraform-bedrock-api-specs-buckt"
-}
 
-resource "null_resource" "download-api-specs" {
-  provisioner "local-exec" {
-    command= <<-EOT
-    aws s3 cp ./image/amazon-bedrock-agents-quickstart/agent_aws_openapi.json s3://${aws_s3_bucket.api-specs-bucket.bucket}/agent_aws_openapi.json
-  EOT
+
+resource "aws_bedrockagent_agent_action_group" "claude-group" {
+  action_group_name          = "example"
+  agent_id                   = aws_bedrockagent_agent.example.agent_id
+  agent_version              = "DRAFT"
+  action_group_state         = "ENABLED"
+  skip_resource_in_use_check = true
+  action_group_executor {
+    lambda = aws_lambda_function.bedrock-claude-lambda.arn
+  }
+  api_schema {
+    s3 {
+      s3_bucket_name =  aws_s3_bucket.api-specs-bucket.bucket
+      s3_object_key  = "agent_aws_openapi.json"
+    }
   }
 }
-*/
-
-
