@@ -25,6 +25,10 @@ agent_instruction="You are an expert AWS Certified Solutions Architect. Your rol
 
 ecr_name="agent_ecr_bedrock"
 
+lambda_function_name="bedrock-lambda-test"
+
+lambda_invoke_policy_name="lambda-invoke-policy"
+
  }
 
 

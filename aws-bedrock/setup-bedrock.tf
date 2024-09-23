@@ -16,6 +16,14 @@ data "aws_bedrock_foundation_model" "this" {
   model_id = var.bedrock_model
 }
 
+data "aws_bedrock_foundation_model" "second-model" {
+  model_id="amazon.titan-embed-text-v1"
+}
+
+data "aws_bedrock_foundation_model" "third_model" {
+  model_id="anthropic.claude-3-sonnet-20240229-v1:0"
+}
+
 
 resource "aws_iam_policy" "bedrock-invoke-policy" {
   name = var.bedrock_invoke_policy_name
@@ -26,11 +34,25 @@ resource "aws_iam_policy" "bedrock-invoke-policy" {
       {
         Action   = ["bedrock:InvokeModel"]
         Effect   = "Allow"
-        Resource = data.aws_bedrock_foundation_model.this.model_arn
+        Resource = [data.aws_bedrock_foundation_model.this.model_arn,data.aws_bedrock_foundation_model.second-model.model_arn,
+        data.aws_bedrock_foundation_model.third_model.model_arn]
       }
     ]
   })
   depends_on=[data.aws_bedrock_foundation_model.this]
+}
+
+
+resource "aws_s3_bucket" "api-specs-bucket" {
+  bucket = "terraform-bedrock-api-specs-buckt"
+}
+
+resource "null_resource" "download-api-specs" {
+  provisioner "local-exec" {
+    command= <<-EOT
+    aws s3 cp ./image/amazon-bedrock-agents-quickstart/agent_aws_openapi.json s3://${aws_s3_bucket.api-specs-bucket.bucket}/agent_aws_openapi.json
+  EOT
+  }
 }
 
 resource "aws_iam_policy" "retrieve-schema-policy" {
@@ -42,46 +64,14 @@ resource "aws_iam_policy" "retrieve-schema-policy" {
       {
         Action   = ["s3:GetObject"]
         Effect   = "Allow"
-        Resource = "arn:aws:s3:::bedrockreinvent/agent_aws_openapi.json"
+        Resource = ["arn:aws:s3:::bedrockreinvent/agent_aws_openapi.json",
+                "${aws_s3_bucket.api-specs-bucket.arn}/agent_aws_openapi.json"]
       }
     ]
   })
 
 }
 
-
-
-resource "aws_iam_role" "bedrock-role" {
-  assume_role_policy = jsonencode({
-    Statement = [{
-      Action    = "sts:AssumeRole"
-      Effect    = "Allow"
-      Principal = {
-        Service = "bedrock.amazonaws.com"
-        }
-      Condition = { 
-        StringEquals = {"aws:SourceAccount" = local.account_id}
-        ArnLike = {"aws:SourceArn" = "arn:${local.partition}:bedrock:${local.region}:${local.account_id}:agent/*"}
-      }
-
-      }
-    ]
-    Version = "2012-10-17"
-  })
-  description           = null
-  force_detach_policies = false
-  managed_policy_arns   = [aws_iam_policy.retrieve-schema-policy.arn, aws_iam_policy.bedrock-invoke-policy.arn]
-  max_session_duration  = 3600
-  name                  = var.bedrock_role //AmazonBedrockExecutionRoleForAgents_workshop
-  name_prefix           = null
-  path                  = "/"
-  permissions_boundary  = null
-  tags                  = {}
-  tags_all              = {}
-
-  depends_on=[aws_iam_policy.retrieve-schema-policy, aws_iam_policy.bedrock-invoke-policy]
-
-}
 
 resource "aws_bedrockagent_agent" "example" {
   agent_name                  = var.agent_name
@@ -149,19 +139,23 @@ data "aws_iam_policy_document" "lambda-execution-policy" {
 }
 
 
-
 resource "aws_iam_role" "iam-for-lambda" {
   name               = "iam_for_lambda"
-  assume_role_policy = data.aws_iam_policy_documnet.lambda-execution-policy.json
-   managed_policy_arns   = [aws_iam_policy.lambda-bedrock-invoke-policy.arn]
+  assume_role_policy = data.aws_iam_policy_document.lambda-execution-policy.json
+   managed_policy_arns   = [aws_iam_policy.bedrock-invoke-policy.arn]
 }
 
 
 
-
 resource "aws_lambda_function" "bedrock-claude-lambda" {
-  name = var.lambda_function_name
+  function_name = var.lambda_function_name
   role=aws_iam_role.iam-for-lambda.arn
+  package_type="Image"
+  memory_size=512
+  timeout=30
+
+  ##handler="index.py"
+  ##runtime="python3.11"
   image_uri=replace("${data.aws_ecr_authorization_token.token.proxy_endpoint}/${var.ecr_name}:latest","https://","")
 
 
@@ -187,16 +181,16 @@ data "aws_iam_policy_document" "lambda_logging" {
   }
 }
 
-resource "aws_iam_policy" "lambda_logging" {
-  name        = "lambda_logging"
+resource "aws_iam_policy" "lambda-logging" {
+  name        = "lambda_logging_${var.lambda_function_name}"
   path        = "/"
   description = "IAM policy for logging from a lambda"
   policy      = data.aws_iam_policy_document.lambda_logging.json
 }
 
 resource "aws_iam_role_policy_attachment" "lambda_logs" {
-  role       = aws_iam_role.iam_for_lambda.name
-  policy_arn = aws_iam_role.iam-for-lambda.arn
+  role       = aws_iam_role.iam-for-lambda.name
+  policy_arn = aws_iam_policy.lambda-logging.arn
 }
 
 
@@ -251,4 +245,19 @@ resource "aws_iam_role" "bedrock-role" {
   depends_on=[aws_iam_policy.retrieve-schema-policy, aws_iam_policy.bedrock-invoke-policy]
 
 }
+
+/*
+resource "aws_s3_bucket" "api-specs-bucket" {
+  bucket = "terraform-bedrock-api-specs-buckt"
+}
+
+resource "null_resource" "download-api-specs" {
+  provisioner "local-exec" {
+    command= <<-EOT
+    aws s3 cp ./image/amazon-bedrock-agents-quickstart/agent_aws_openapi.json s3://${aws_s3_bucket.api-specs-bucket.bucket}/agent_aws_openapi.json
+  EOT
+  }
+}
+*/
+
 

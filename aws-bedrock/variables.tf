@@ -34,3 +34,11 @@ variable "agent_instruction" {
 variable "ecr_name" {
   type=string
 }
+
+variable "lambda_function_name"{
+  type=string
+}
+
+variable "lambda_invoke_policy_name" {
+  type=string
+}
